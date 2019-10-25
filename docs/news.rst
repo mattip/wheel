@@ -5,6 +5,7 @@ Release Notes
 
 - Added automatic platform tag detection for macOS binary wheels
   (PR by Grzegorz Bokota)
+- Added the ``--compression=`` option to the ``bdist_wheel`` command
 - Updated project packaging and testing configuration for :pep:`517`
 - Moved the contents of setup.py to setup.cfg
 

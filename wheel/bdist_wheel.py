@@ -8,6 +8,7 @@ import os
 import shutil
 import sys
 import re
+from collections import OrderedDict
 from email.generator import Generator
 from distutils.core import Command
 from distutils.sysconfig import get_python_version
@@ -15,6 +16,7 @@ from distutils import log as logger
 from glob import iglob
 from shutil import rmtree
 from warnings import warn
+from zipfile import ZIP_DEFLATED, ZIP_STORED
 
 import pkg_resources
 
@@ -44,6 +46,11 @@ class bdist_wheel(Command):
 
     description = 'create a wheel distribution'
 
+    supported_compressions = OrderedDict([
+        ('stored', ZIP_STORED),
+        ('deflated', ZIP_DEFLATED)
+    ])
+
     user_options = [('bdist-dir=', 'b',
                      "temporary directory for creating the distribution"),
                     ('plat-name=', 'p',
@@ -68,6 +75,10 @@ class bdist_wheel(Command):
                     ('universal', None,
                      "make a universal wheel"
                      " (default: false)"),
+                    ('compression=', None,
+                     "zipfile compression (one of: {})"
+                     " (default: 'deflated')"
+                     .format(', '.join(supported_compressions))),
                     ('python-tag=', None,
                      "Python implementation compatibility tag"
                      " (default: py%s)" % get_impl_ver()[0]),
@@ -97,6 +108,7 @@ class bdist_wheel(Command):
         self.owner = None
         self.group = None
         self.universal = False
+        self.compression = 'deflated'
         self.python_tag = 'py' + get_impl_ver()[0]
         self.build_number = None
         self.py_limited_api = False
@@ -109,6 +121,11 @@ class bdist_wheel(Command):
 
         self.data_dir = self.wheel_dist_name + '.data'
         self.plat_name_supplied = self.plat_name is not None
+
+        try:
+            self.compression = self.supported_compressions[self.compression]
+        except KeyError:
+            raise ValueError('Unsupported compression: {}'.format(self.compression))
 
         need_options = ('dist_dir', 'plat_name', 'skip_build')
 
@@ -257,7 +274,7 @@ class bdist_wheel(Command):
             os.makedirs(self.dist_dir)
 
         wheel_path = os.path.join(self.dist_dir, archive_basename + '.whl')
-        with WheelFile(wheel_path, 'w') as wf:
+        with WheelFile(wheel_path, 'w', self.compression) as wf:
             wf.write_files(archive_root)
 
         # Add to 'Distribution.dist_files' so that the "upload" command works

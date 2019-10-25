@@ -6,6 +6,7 @@ from zipfile import ZipFile
 
 import pytest
 
+from wheel.bdist_wheel import bdist_wheel
 from wheel.wheelfile import WheelFile
 
 DEFAULT_FILES = {
@@ -110,3 +111,17 @@ def test_limited_abi(monkeypatch, tmpdir):
     monkeypatch.chdir(source_dir)
     subprocess.check_call([sys.executable, 'setup.py',  'bdist_wheel', '-b', str(build_dir),
                            '-d', str(dist_dir)])
+
+
+@pytest.mark.parametrize('option, compress_type', list(bdist_wheel.supported_compressions.items()),
+                         ids=list(bdist_wheel.supported_compressions))
+def test_compression(dummy_dist, monkeypatch, tmpdir, option, compress_type):
+    monkeypatch.chdir(dummy_dist)
+    subprocess.check_call([sys.executable, 'setup.py', 'bdist_wheel', '-b', str(tmpdir),
+                           '--universal', '--compression={}'.format(option)])
+    with WheelFile('dist/dummy_dist-1.0-py2.py3-none-any.whl') as wf:
+        filenames = set(wf.namelist())
+        assert 'dummy_dist-1.0.dist-info/RECORD' in filenames
+        assert 'dummy_dist-1.0.dist-info/METADATA' in filenames
+        for zinfo in wf.filelist:
+            assert zinfo.compress_type == compress_type
